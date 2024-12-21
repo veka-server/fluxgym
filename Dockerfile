@@ -21,12 +21,11 @@ WORKDIR /app
 
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
-    cd sd-scripts && \
-    pip install --no-cache-dir -r ./requirements.txt
+#    pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
 COPY ./requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r ./requirements.txt
+# RUN pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
@@ -34,8 +33,8 @@ RUN pip install torch torchvision torchaudio --extra-index-url https://download.
 RUN chown -R appuser:appuser /app
 
 # delete redundant requirements.txt and sd-scripts directory within the container
-RUN rm -r ./sd-scripts
-RUN rm ./requirements.txt
+#RUN rm -r ./sd-scripts
+#RUN rm ./requirements.txt
 
 #Run application as non-root
 USER appuser
