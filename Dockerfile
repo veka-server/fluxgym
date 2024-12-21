@@ -40,18 +40,17 @@ COPY ./requirements.txt ./requirements.txt
 
 # Copy fluxgym application code
 COPY . ./fluxgym
+WORKDIR /app/fluxgym
 
 # Copy entrypoint script and make it executable
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint.sh entrypoint.sh
+RUN chmod +x entrypoint.sh
 
 RUN chown -R appuser:appuser /app
 
 EXPOSE 7860
 
 ENV GRADIO_SERVER_NAME="0.0.0.0"
-
-WORKDIR /app/fluxgym
 
 #USER appuser
 RUN ls -alh
