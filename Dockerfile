@@ -41,7 +41,11 @@ COPY ./requirements.txt ./requirements.txt
 # Copy fluxgym application code
 COPY . ./fluxgym
 
-RUN chown -R appuser:appuser /app ; chmod -r 777 +x /app/fluxgym/entrypoint.sh
+# Copy entrypoint script and make it executable
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+RUN chown -R appuser:appuser /app
 
 EXPOSE 7860
 
