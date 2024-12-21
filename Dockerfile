@@ -50,5 +50,5 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 WORKDIR /app/fluxgym
 
 # Run fluxgym Python application
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/fluxgym/entrypoint.sh"]
 CMD ["python3", "./app.py"]
