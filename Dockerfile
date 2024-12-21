@@ -31,7 +31,6 @@ COPY ./requirements.txt ./requirements.txt
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 #RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 
-RUN chown -R appuser:appuser /app
 
 # delete redundant requirements.txt and sd-scripts directory within the container
 #RUN rm -r ./sd-scripts
@@ -42,6 +41,8 @@ USER appuser
 
 # Copy fluxgym application code
 COPY . ./fluxgym
+
+RUN chown -R appuser:appuser /app
 
 EXPOSE 7860
 
