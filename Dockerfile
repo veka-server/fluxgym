@@ -37,7 +37,6 @@ COPY ./requirements.txt ./requirements.txt
 #RUN rm ./requirements.txt
 
 #Run application as non-root
-USER appuser
 
 # Copy fluxgym application code
 COPY . ./fluxgym
@@ -49,6 +48,8 @@ EXPOSE 7860
 ENV GRADIO_SERVER_NAME="0.0.0.0"
 
 WORKDIR /app/fluxgym
+
+USER appuser
 
 # Run fluxgym Python application
 ENTRYPOINT ["/app/fluxgym/entrypoint.sh"]
