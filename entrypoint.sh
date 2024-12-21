@@ -6,7 +6,7 @@ set -e
 # Check if requirements.txt exists and install dependencies
 if [ -f "/app/fluxgym/requirements.txt" ]; then
     echo "Installing Python dependencies..."
-#    pip install --no-cache-dir -r /app/sd-scripts/requirements.txt
+    pip install --no-cache-dir -r /app/sd-scripts/requirements.txt
     pip install --no-cache-dir -r /app/fluxgym/requirements.txt
     pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 else
