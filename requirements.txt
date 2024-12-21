@@ -36,7 +36,7 @@ imagesize
 # sd-scripts
 accelerate==0.33.0
 transformers==4.44.0
-diffusers[torch]==0.25.0
+diffusers==0.25.0
 ftfy==6.1.1
 opencv-python==4.8.1.78
 einops==0.7.0
