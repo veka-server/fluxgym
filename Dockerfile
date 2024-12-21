@@ -57,5 +57,5 @@ WORKDIR /app/fluxgym
 RUN ls -alh
 
 # Run fluxgym Python application
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/fluxgym/entrypoint.sh"]
 CMD ["python3", "./app.py"]
