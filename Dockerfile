@@ -20,7 +20,7 @@ RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 WORKDIR /app
 
 # Get sd-scripts from kohya-ss and install them
-RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
+RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts
 #    pip install --no-cache-dir -r ./requirements.txt
 
 # Install main application dependencies
