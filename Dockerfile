@@ -52,4 +52,4 @@ WORKDIR /app/fluxgym
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python3", "./app.py"]
+#CMD ["python3", "./app.py"]
