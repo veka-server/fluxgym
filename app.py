@@ -13,7 +13,7 @@ import shutil
 import json
 import yaml
 from slugify import slugify
-from transformers import AutoProcessor, AutoModelForCausalLM, CLIPProcessor
+from transformers import AutoProcessor, AutoModelForCausalLM
 from gradio_logsview import LogsView, LogsViewRunner
 from huggingface_hub import hf_hub_download, HfApi
 from library import flux_train_utils, huggingface_util
@@ -266,111 +266,53 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
-import torch
-from transformers import AutoModelForCausalLM, AutoProcessor, CLIPProcessor
-from PIL import Image
 
 def run_captioning(images, concept_sentence, *captions):
-    """
-    Génère des descriptions d'images basées sur une phrase conceptuelle et des images fournies.
-    
-    Args:
-        images (list): Liste des chemins vers les images ou objets PIL.Image.
-        concept_sentence (str): Phrase conceptuelle pour guider la description.
-        *captions (str): Légendes existantes à mettre à jour ou modifier.
-
-    Yields:
-        list: Liste mise à jour des légendes pour chaque image.
-    """
-    print("Running captioning...")
-    print(f"Concept sentence: {concept_sentence}")
-    print(f"Initial captions: {captions}")
-
-    # Détection de l'appareil disponible
+    print(f"run_captioning")
+    print(f"concept sentence {concept_sentence}")
+    print(f"captions {captions}")
+    #Load internally to not consume resources for training
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-    torch_dtype = torch.float16 if device == "cuda" else torch.float32
-
-    # Charger le modèle et les processeurs
-    print("Loading model and processors...")
+    print(f"device={device}")
+    torch_dtype = torch.float16
     model = AutoModelForCausalLM.from_pretrained(
-        "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
-        torch_dtype=torch_dtype,
-        trust_remote_code=True
-    )
+        "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
+    ).to(device)
+    processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
 
-    tokenizer = AutoProcessor.from_pretrained(
-        "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
-        trust_remote_code=True
-    )
-
-    image_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
-    # Convertir les légendes en liste mutable
     captions = list(captions)
-
-    # Traiter chaque image
     for i, image_path in enumerate(images):
-        try:
-            print(f"Processing image {i + 1}/{len(images)}...")
+        print(captions[i])
+        if isinstance(image_path, str):  # If image is a file path
+            image = Image.open(image_path).convert("RGB")
 
-            # Charger l'image
-            if isinstance(image_path, str):
-                image = Image.open(image_path).convert("RGB")
-            elif isinstance(image_path, Image.Image):
-                image = image_path
-            else:
-                raise ValueError("Unsupported image format. Provide a file path or PIL.Image object.")
+        prompt = "<DETAILED_CAPTION>"
+        inputs = processor(text=prompt, images=image, return_tensors="pt").to(device, torch_dtype)
+        print(f"inputs {inputs}")
 
-            # Préparer les données d'image
-            processed_image = image_processor(images=image, return_tensors="pt")
-            processed_image = {key: value.to(device) for key, value in processed_image.items()}
+        generated_ids = model.generate(
+            input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
+        )
+        print(f"generated_ids {generated_ids}")
 
-            # Préparer les données textuelles
-            input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device)
+        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+        print(f"generated_text: {generated_text}")
+        parsed_answer = processor.post_process_generation(
+            generated_text, task=prompt, image_size=(image.width, image.height)
+        )
+        print(f"parsed_answer = {parsed_answer}")
+        caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
+        print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+        if concept_sentence:
+            caption_text = f"{concept_sentence} {caption_text}"
+        captions[i] = caption_text
 
-            # Combiner les entrées
-            inputs = {
-                "input_ids": input_text["input_ids"],
-                "pixel_values": processed_image["pixel_values"]
-            }
-
-            # Générer des légendes
-            print(f"Generating caption for image {i + 1}...")
-            generated_ids = model.generate(
-                input_ids=inputs["input_ids"],
-                pixel_values=inputs["pixel_values"],
-                max_new_tokens=128,
-                num_beams=3,
-                temperature=0.7
-            )
-
-            # Décoder les résultats
-            generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-            print(f"Generated text: {generated_text}")
-
-            # Extraire la légende et la mettre à jour
-            caption_text = generated_text.replace("The image shows ", "").strip()
-            if concept_sentence:
-                caption_text = f"{concept_sentence} {caption_text}"
-            captions[i] = caption_text
-            print(f"Updated caption: {caption_text}")
-
-        except Exception as e:
-            print(f"Error processing image {i + 1}: {e}")
-            captions[i] = f"Error processing image: {e}"
-
-        # Retourner les légendes mises à jour
         yield captions
-
-    # Nettoyage des ressources
-    print("Cleaning up resources...")
-    # model.to("cpu")
-    del model, tokenizer, image_processor
+    model.to("cpu")
+    del model
+    del processor
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
-
 
 def recursive_update(d, u):
     for k, v in u.items():
@@ -1003,7 +945,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                             scale=1,
                         )
                     with gr.Group(visible=False) as captioning_area:
-                        do_captioning = gr.Button("Add AI captions with Llama 3.1")
+                        do_captioning = gr.Button("Add AI captions with Florence-2")
                         output_components.append(captioning_area)
                         #output_components = [captioning_area]
                         caption_list = []
