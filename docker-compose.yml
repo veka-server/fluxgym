@@ -27,10 +27,10 @@ services:
     restart: unless-stopped
     networks:
       - no-internet
-      - bridge
+      - custom-bridge
 
 networks:
   no-internet:
     external: true
-  bridge:
-    external: true
+  custom-bridge:
+    driver: bridge
