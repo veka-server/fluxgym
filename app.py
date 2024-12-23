@@ -266,19 +266,23 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
-
 def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
-    #Load internally to not consume resources for training
+
+    # Load internally to not consume resources for training
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device}")
     torch_dtype = torch.float16
+
+    # Load the new model and processor
     model = AutoModelForCausalLM.from_pretrained(
-        "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
+        "MiaoshouAI/Florence-2-base-PromptGen-v2.0", torch_dtype=torch_dtype, trust_remote_code=True
     ).to(device)
-    processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
+    processor = AutoProcessor.from_pretrained(
+        "MiaoshouAI/Florence-2-base-PromptGen-v2.0", trust_remote_code=True
+    )
 
     captions = list(captions)
     for i, image_path in enumerate(images):
@@ -297,22 +301,28 @@ def run_captioning(images, concept_sentence, *captions):
 
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
         print(f"generated_text: {generated_text}")
+
         parsed_answer = processor.post_process_generation(
             generated_text, task=prompt, image_size=(image.width, image.height)
         )
         print(f"parsed_answer = {parsed_answer}")
+
         caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
         print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+
         if concept_sentence:
             caption_text = f"{concept_sentence} {caption_text}"
         captions[i] = caption_text
 
         yield captions
+
     model.to("cpu")
     del model
     del processor
+
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
 
 def recursive_update(d, u):
     for k, v in u.items():
