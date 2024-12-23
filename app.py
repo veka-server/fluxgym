@@ -289,8 +289,11 @@ def run_captioning(images, concept_sentence, *captions):
             image = Image.open(image_path).convert("RGB")
 
         # Process image and text separately
-        processed_image = image_processor(images=image, return_tensors="pt").to(device, torch_dtype)
-        input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device, torch_dtype)
+        processed_image = image_processor(images=image, return_tensors="pt")
+        # Move tensors to device
+        processed_image = {key: value.to(device) for key, value in processed_image.items()}
+        
+        input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device)
 
         # Combine inputs into the format expected by the model
         inputs = {
@@ -324,6 +327,7 @@ def run_captioning(images, concept_sentence, *captions):
     del image_processor
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
 
 def recursive_update(d, u):
     for k, v in u.items():
