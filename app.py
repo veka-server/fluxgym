@@ -276,9 +276,9 @@ def run_captioning(images, concept_sentence, *captions):
     print(f"device={device}")
     torch_dtype = torch.float16
     model = AutoModelForCausalLM.from_pretrained(
-        "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
+        "unsloth/Meta-Llama-3.1-8B-bnb-4bit", torch_dtype=torch_dtype, trust_remote_code=True
     ).to(device)
-    processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
+    processor = AutoProcessor.from_pretrained("unsloth/Meta-Llama-3.1-8B-bnb-4bit", trust_remote_code=True)
 
     captions = list(captions)
     for i, image_path in enumerate(images):
@@ -945,7 +945,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                             scale=1,
                         )
                     with gr.Group(visible=False) as captioning_area:
-                        do_captioning = gr.Button("Add AI captions with Florence-2")
+                        do_captioning = gr.Button("Add AI captions with Llama 3.1")
                         output_components.append(captioning_area)
                         #output_components = [captioning_area]
                         caption_list = []
