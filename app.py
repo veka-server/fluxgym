@@ -365,7 +365,7 @@ def run_captioning(images, concept_sentence, *captions):
 
     # Nettoyage des ressources
     print("Cleaning up resources...")
-    model.to("cpu")
+    # model.to("cpu")
     del model, tokenizer, image_processor
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
