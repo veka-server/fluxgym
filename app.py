@@ -266,67 +266,110 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
-def run_captioning(images, concept_sentence, *captions):
-    print(f"run_captioning")
-    print(f"concept sentence {concept_sentence}")
-    print(f"captions {captions}")
-    
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device={device}")
-    torch_dtype = torch.float16
+import torch
+from transformers import AutoModelForCausalLM, AutoProcessor, CLIPProcessor
+from PIL import Image
 
-    # Load the model and processor
+def run_captioning(images, concept_sentence, *captions):
+    """
+    Génère des descriptions d'images basées sur une phrase conceptuelle et des images fournies.
+    
+    Args:
+        images (list): Liste des chemins vers les images ou objets PIL.Image.
+        concept_sentence (str): Phrase conceptuelle pour guider la description.
+        *captions (str): Légendes existantes à mettre à jour ou modifier.
+
+    Yields:
+        list: Liste mise à jour des légendes pour chaque image.
+    """
+    print("Running captioning...")
+    print(f"Concept sentence: {concept_sentence}")
+    print(f"Initial captions: {captions}")
+
+    # Détection de l'appareil disponible
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    torch_dtype = torch.float16 if device == "cuda" else torch.float32
+
+    # Charger le modèle et les processeurs
+    print("Loading model and processors...")
     model = AutoModelForCausalLM.from_pretrained(
-        "unsloth/Meta-Llama-3.1-8B-bnb-4bit", torch_dtype=torch_dtype, trust_remote_code=True
+        "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
+        torch_dtype=torch_dtype,
+        trust_remote_code=True
+    ).to(device)
+
+    tokenizer = AutoProcessor.from_pretrained(
+        "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
+        trust_remote_code=True
     )
-    tokenizer = AutoProcessor.from_pretrained("unsloth/Meta-Llama-3.1-8B-bnb-4bit", trust_remote_code=True)
+
     image_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+    # Convertir les légendes en liste mutable
     captions = list(captions)
+
+    # Traiter chaque image
     for i, image_path in enumerate(images):
-        print(captions[i])
-        if isinstance(image_path, str):  # If image is a file path
-            image = Image.open(image_path).convert("RGB")
+        try:
+            print(f"Processing image {i + 1}/{len(images)}...")
 
-        # Process image and text separately
-        processed_image = image_processor(images=image, return_tensors="pt")
-        # Move tensors to device
-        processed_image = {key: value.to(device) for key, value in processed_image.items()}
-        
-        input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device)
+            # Charger l'image
+            if isinstance(image_path, str):
+                image = Image.open(image_path).convert("RGB")
+            elif isinstance(image_path, Image.Image):
+                image = image_path
+            else:
+                raise ValueError("Unsupported image format. Provide a file path or PIL.Image object.")
 
-        # Combine inputs into the format expected by the model
-        inputs = {
-            "input_ids": input_text["input_ids"],
-            "pixel_values": processed_image["pixel_values"],
-        }
-        print(f"inputs: {inputs}")
+            # Préparer les données d'image
+            processed_image = image_processor(images=image, return_tensors="pt")
+            processed_image = {key: value.to(device) for key, value in processed_image.items()}
 
-        # Generate captions
-        generated_ids = model.generate(
-            input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
-        )
-        print(f"generated_ids: {generated_ids}")
+            # Préparer les données textuelles
+            input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device)
 
-        generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        print(f"generated_text: {generated_text}")
+            # Combiner les entrées
+            inputs = {
+                "input_ids": input_text["input_ids"],
+                "pixel_values": processed_image["pixel_values"]
+            }
 
-        # Extract detailed caption
-        caption_text = generated_text.replace("The image shows ", "")
-        print(f"caption_text: {caption_text}, concept_sentence: {concept_sentence}")
-        if concept_sentence:
-            caption_text = f"{concept_sentence} {caption_text}"
-        captions[i] = caption_text
+            # Générer des légendes
+            print(f"Generating caption for image {i + 1}...")
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=128,
+                num_beams=3,
+                temperature=0.7
+            )
 
+            # Décoder les résultats
+            generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            print(f"Generated text: {generated_text}")
+
+            # Extraire la légende et la mettre à jour
+            caption_text = generated_text.replace("The image shows ", "").strip()
+            if concept_sentence:
+                caption_text = f"{concept_sentence} {caption_text}"
+            captions[i] = caption_text
+            print(f"Updated caption: {caption_text}")
+
+        except Exception as e:
+            print(f"Error processing image {i + 1}: {e}")
+            captions[i] = f"Error processing image: {e}"
+
+        # Retourner les légendes mises à jour
         yield captions
 
-    # Clean up
+    # Nettoyage des ressources
+    print("Cleaning up resources...")
     model.to("cpu")
-    del model
-    del tokenizer
-    del image_processor
+    del model, tokenizer, image_processor
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
 
 
 def recursive_update(d, u):
