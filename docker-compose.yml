@@ -1,5 +1,4 @@
 services:
-
   fluxgym:
     build:
       context: .
@@ -26,3 +25,6 @@ services:
             count: all
             capabilities: [gpu]
     restart: unless-stopped
+    networks:
+      - no-internet
+      - bridge
