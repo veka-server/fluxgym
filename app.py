@@ -271,13 +271,15 @@ def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
-    #Load internally to not consume resources for training
+    # Load internally to not consume resources for training
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device}")
     torch_dtype = torch.float16
+
+    # Remove `.to(device)` when loading the model
     model = AutoModelForCausalLM.from_pretrained(
         "unsloth/Meta-Llama-3.1-8B-bnb-4bit", torch_dtype=torch_dtype, trust_remote_code=True
-    ).to(device)
+    )
     processor = AutoProcessor.from_pretrained("unsloth/Meta-Llama-3.1-8B-bnb-4bit", trust_remote_code=True)
 
     captions = list(captions)
@@ -308,6 +310,8 @@ def run_captioning(images, concept_sentence, *captions):
         captions[i] = caption_text
 
         yield captions
+
+    # Clean up
     model.to("cpu")
     del model
     del processor
