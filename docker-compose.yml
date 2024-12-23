@@ -28,3 +28,9 @@ services:
     networks:
       - no-internet
       - bridge
+
+networks:
+  no-internet:
+    external: true
+  bridge:
+    external: true
