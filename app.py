@@ -266,21 +266,21 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
-
 def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
-    # Load internally to not consume resources for training
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device}")
     torch_dtype = torch.float16
 
-    # Remove `.to(device)` when loading the model
+    # Load the model and processor
     model = AutoModelForCausalLM.from_pretrained(
         "unsloth/Meta-Llama-3.1-8B-bnb-4bit", torch_dtype=torch_dtype, trust_remote_code=True
     )
-    processor = AutoProcessor.from_pretrained("unsloth/Meta-Llama-3.1-8B-bnb-4bit", trust_remote_code=True)
+    tokenizer = AutoProcessor.from_pretrained("unsloth/Meta-Llama-3.1-8B-bnb-4bit", trust_remote_code=True)
+    image_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     captions = list(captions)
     for i, image_path in enumerate(images):
@@ -288,23 +288,29 @@ def run_captioning(images, concept_sentence, *captions):
         if isinstance(image_path, str):  # If image is a file path
             image = Image.open(image_path).convert("RGB")
 
-        prompt = "<DETAILED_CAPTION>"
-        inputs = processor(text=prompt, images=image, return_tensors="pt").to(device, torch_dtype)
-        print(f"inputs {inputs}")
+        # Process image and text separately
+        processed_image = image_processor(images=image, return_tensors="pt").to(device, torch_dtype)
+        input_text = tokenizer(text=concept_sentence, return_tensors="pt").to(device, torch_dtype)
 
+        # Combine inputs into the format expected by the model
+        inputs = {
+            "input_ids": input_text["input_ids"],
+            "pixel_values": processed_image["pixel_values"],
+        }
+        print(f"inputs: {inputs}")
+
+        # Generate captions
         generated_ids = model.generate(
             input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
         )
-        print(f"generated_ids {generated_ids}")
+        print(f"generated_ids: {generated_ids}")
 
-        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+        generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         print(f"generated_text: {generated_text}")
-        parsed_answer = processor.post_process_generation(
-            generated_text, task=prompt, image_size=(image.width, image.height)
-        )
-        print(f"parsed_answer = {parsed_answer}")
-        caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
-        print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+
+        # Extract detailed caption
+        caption_text = generated_text.replace("The image shows ", "")
+        print(f"caption_text: {caption_text}, concept_sentence: {concept_sentence}")
         if concept_sentence:
             caption_text = f"{concept_sentence} {caption_text}"
         captions[i] = caption_text
@@ -314,7 +320,8 @@ def run_captioning(images, concept_sentence, *captions):
     # Clean up
     model.to("cpu")
     del model
-    del processor
+    del tokenizer
+    del image_processor
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
