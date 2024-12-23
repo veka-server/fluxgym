@@ -297,7 +297,7 @@ def run_captioning(images, concept_sentence, *captions):
         "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
         torch_dtype=torch_dtype,
         trust_remote_code=True
-    ).to(device)
+    )
 
     tokenizer = AutoProcessor.from_pretrained(
         "unsloth/Meta-Llama-3.1-8B-bnb-4bit",
