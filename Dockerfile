@@ -55,7 +55,8 @@ RUN pip install --no-cache-dir huggingface_hub
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
 RUN HF_HUB_OFFLINE=0 huggingface-cli download openai/clip-vit-large-patch14 && \
-    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl
+    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl && \\
+    HF_HUB_OFFLINE=0 huggingface-cli download MiaoshouAI/Florence-2-base-PromptGen-v2.0
 
 # Ajouter la variable d'environnement pour le mode offline
 ENV HF_HUB_OFFLINE=1
