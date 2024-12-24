@@ -15,7 +15,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - ./:/app/fluxgym
-      - /home/veka/fluxgym/cache_huggingface:/home/appuser/.cache/huggingface/
+      - ../cache_huggingface:/home/appuser/.cache/huggingface/
     stop_signal: SIGKILL
     tty: true
     deploy:
