@@ -17,6 +17,9 @@ RUN groupadd -g "${PGID}" appuser
 # Create a user with the specified UID and GID
 RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
+# use volume for cached model huggingface
+VOLUME /home/appuser/.cache/huggingface/
+
 WORKDIR /app
 
 # Get sd-scripts from kohya-ss and install them
