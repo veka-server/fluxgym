@@ -1,5 +1,5 @@
 # Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
+FROM nvidia/cuda:12.2.2-dev-ubuntu22.04
 
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
@@ -30,6 +30,8 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+
+RUN pip install flash_attn
 
 RUN chown -R appuser:appuser /app
 
