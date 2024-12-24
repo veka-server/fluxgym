@@ -49,7 +49,11 @@ COPY . ./fluxgym
 
 WORKDIR /app/fluxgym
 
+USER root
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 7860
 
