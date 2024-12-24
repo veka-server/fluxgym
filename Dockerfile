@@ -62,7 +62,7 @@ RUN pip install --no-cache-dir huggingface_hub
 ENV HF_HUB_OFFLINE=1
 
 # use volume for cached model huggingface
-VOLUME ["/home/appuser/.cache/huggingface/", "label=fluxgym_huggingface_models"]
+VOLUME /home/appuser/.cache/huggingface/
 
 WORKDIR /app/fluxgym
 
