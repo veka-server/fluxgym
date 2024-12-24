@@ -33,7 +33,8 @@ RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts ;
 
 # install pip library
 RUN pip install --no-cache-dir -r ./requirements.txt \
-    pip install --no-cache-dir -r ./sd-scripts/requirements.txt
+    cd sd-scripts ; \
+    pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 RUN pip install huggingface_hub flash_attn torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
