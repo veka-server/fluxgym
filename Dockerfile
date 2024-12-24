@@ -66,5 +66,14 @@ VOLUME /home/appuser/.cache/huggingface/
 
 WORKDIR /app/fluxgym
 
+WORKDIR /app/fluxgym
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Run fluxgym Python application
 CMD ["python3", "./app.py"]
