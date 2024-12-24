@@ -15,7 +15,10 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ./:/app/fluxgym
+      - ../models/clip:/app/fluxgym/models/clip
+      - ../models/unet:/app/fluxgym/models/unet
+      - ../models/vae:/app/fluxgym/models/vae
+      - ../outputs:/app/fluxgym/outputs
       - ../cache_huggingface:/home/appuser/.cache/huggingface/
     stop_signal: SIGKILL
     tty: true
