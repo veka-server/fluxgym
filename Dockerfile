@@ -12,6 +12,10 @@ RUN apt-get update -y && apt-get install -y \
 ENV PUID=${PUID:-1000}
 ENV PGID=${PGID:-1000}
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chown appuser:appuser /entrypoint.sh; chmod +x /entrypoint.sh
+
 # Create a group with the specified GID
 RUN groupadd -g "${PGID}" appuser
 # Create a user with the specified UID and GID
@@ -47,7 +51,6 @@ EXPOSE 7860
 
 ENV GRADIO_SERVER_NAME="0.0.0.0"
 
-USER appuser
 WORKDIR /home/appuser
 
 # Installer huggingface-cli
@@ -65,12 +68,6 @@ ENV HF_HUB_OFFLINE=1
 VOLUME /home/appuser/.cache/huggingface/
 
 WORKDIR /app/fluxgym
-
-WORKDIR /app/fluxgym
-
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Use the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
