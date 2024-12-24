@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir -r ./requirements.txt \
     pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install huggingface_hub flash_attn torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+RUN pip install huggingface_hub torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html flash_attn
 
 RUN chown -R appuser:appuser /app
 
