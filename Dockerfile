@@ -17,9 +17,6 @@ RUN groupadd -g "${PGID}" appuser
 # Create a user with the specified UID and GID
 RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
-# use volume for cached model huggingface
-VOLUME ["/home/appuser/.cache/huggingface/", "label=fluxgym_huggingface_models"]
-
 WORKDIR /app
 
 # Get sd-scripts from kohya-ss and install them
@@ -57,12 +54,15 @@ WORKDIR /home/appuser
 RUN pip install --no-cache-dir huggingface_hub
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
-RUN HF_HUB_OFFLINE=0 huggingface-cli download openai/clip-vit-large-patch14 && \
-    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl && \
-    HF_HUB_OFFLINE=0 huggingface-cli download MiaoshouAI/Florence-2-base-PromptGen-v2.0
+#RUN HF_HUB_OFFLINE=0 huggingface-cli download openai/clip-vit-large-patch14 && \
+#    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl && \
+#    HF_HUB_OFFLINE=0 huggingface-cli download MiaoshouAI/Florence-2-base-PromptGen-v2.0
 
-# Ajouter la variable d'environnement pour le mode offline
+# force without internet
 ENV HF_HUB_OFFLINE=1
+
+# use volume for cached model huggingface
+VOLUME ["/home/appuser/.cache/huggingface/", "label=fluxgym_huggingface_models"]
 
 WORKDIR /app/fluxgym
 
