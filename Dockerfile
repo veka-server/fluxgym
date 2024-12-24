@@ -18,7 +18,7 @@ RUN groupadd -g "${PGID}" appuser
 RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
 # use volume for cached model huggingface
-VOLUME /home/appuser/.cache/huggingface/
+VOLUME ["/home/appuser/.cache/huggingface/", "label=fluxgym_huggingface_models"]
 
 WORKDIR /app
 
