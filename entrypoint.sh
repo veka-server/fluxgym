@@ -13,12 +13,9 @@ if [ "$HF_HUB_OFFLINE" = "1" ]; then
 #    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders t5xxl_fp16.safetensors --local-dir models/clip
 #    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders clip_l.safetensors --local-dir models/clip
     
-    HF_HUB_OFFLINE=0 huggingface-cli download cocktailpeanut/xulf-dev flux1-dev.sft 
-    HF_HUB_OFFLINE=0 huggingface-cli download cocktailpeanut/xulf-dev ae.sft 
-    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders clip_l.safetensors 
-    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders t5xxl_fp16.safetensors 
-    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders clip_l.safetensors 
-
+    HF_HUB_OFFLINE=0 huggingface-cli download cocktailpeanut/xulf-dev
+    HF_HUB_OFFLINE=0 huggingface-cli download comfyanonymous/flux_text_encoders
+    
     HF_HUB_OFFLINE=1
 else
     echo "HF_HUB_OFFLINE is set to 0, skipping model downloads."
