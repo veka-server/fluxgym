@@ -17,39 +17,44 @@ RUN apt-get update -y && apt-get install -y \
 # Create a group and user with the specified GID and UID
 RUN groupadd -g "${PGID}" appuser ; useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
+WORKDIR /app
+
+# Get sd-scripts from kohya-ss and install them
+RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
+    cd sd-scripts && \
+    pip install --no-cache-dir -r ./requirements.txt
+
+# Install main application dependencies
+COPY ./requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r ./requirements.txt
+
+# Install Torch, Torchvision, and Torchaudio for CUDA 12.2
+RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+
+RUN chown -R appuser:appuser /app
+
+# delete redundant requirements.txt and sd-scripts directory within the container
+RUN rm -r ./sd-scripts
+RUN rm ./requirements.txt
+
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chown appuser:appuser /entrypoint.sh; chmod +x /entrypoint.sh
 
-WORKDIR /app
+#Run application as non-root
+USER appuser
 
 # Copy fluxgym application code
 COPY . ./fluxgym
 
-RUN chown -R appuser:appuser /app
-
 WORKDIR /app/fluxgym
 
-USER appuser
-
-# Get sd-scripts from kohya-ss
-RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts ;
-
-# install pip library
-RUN pip install --no-cache-dir -r ./requirements.txt ;
-RUN cd sd-scripts ; pip install --no-cache-dir -r ./requirements.txt
-    
-# Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install huggingface_hub torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
-
-RUN chown -R appuser:appuser /app
+RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts
 
 EXPOSE 7860
 
 # use volume for cached model huggingface
 VOLUME /home/appuser/.cache/huggingface/
-
-USER appuser
 
 # Use the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
