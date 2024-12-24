@@ -1,5 +1,5 @@
 # Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-dev-ubuntu22.04
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
