@@ -26,7 +26,11 @@ WORKDIR /app
 # Copy fluxgym application code
 COPY . ./fluxgym
 
+RUN chown -R appuser:appuser /app
+
 WORKDIR /app/fluxgym
+
+USER appuser
 
 # Get sd-scripts from kohya-ss
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts ;
