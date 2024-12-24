@@ -11,10 +11,7 @@ RUN apt-get update -y && apt-get install -y \
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
 ENV PGID=${PGID:-1000}
-
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chown appuser:appuser /entrypoint.sh; chmod +x /entrypoint.sh
+ENV HF_HUB_OFFLINE=1
 
 # Create a group with the specified GID
 RUN groupadd -g "${PGID}" appuser
@@ -41,6 +38,10 @@ RUN chown -R appuser:appuser /app
 RUN rm -r ./sd-scripts
 RUN rm ./requirements.txt
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chown appuser:appuser /entrypoint.sh; chmod +x /entrypoint.sh
+
 #Run application as non-root
 USER appuser
 
@@ -60,9 +61,6 @@ RUN pip install --no-cache-dir huggingface_hub
 #RUN HF_HUB_OFFLINE=0 huggingface-cli download openai/clip-vit-large-patch14 && \
 #    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl && \
 #    HF_HUB_OFFLINE=0 huggingface-cli download MiaoshouAI/Florence-2-base-PromptGen-v2.0
-
-# force without internet
-ENV HF_HUB_OFFLINE=1
 
 # use volume for cached model huggingface
 VOLUME /home/appuser/.cache/huggingface/
