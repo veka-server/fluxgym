@@ -4,7 +4,7 @@ FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
 ENV PGID=${PGID:-1000}
-ENV HF_HUB_OFFLINE=1
+ENV HF_HUB_OFFLINE=1 
 ENV GRADIO_SERVER_NAME="0.0.0.0"
 
 # Install pip if not already installed
@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir -r ./requirements.txt \
     pip install --no-cache-dir -r ./sd-scripts/requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install huggingface_hub torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+RUN pip install huggingface_hub flash_attn torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 
 RUN chown -R appuser:appuser /app
 
