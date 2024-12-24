@@ -11,10 +11,11 @@ services:
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      - HF_HUB_OFFLINE=1
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-#      - ./:/app/fluxgym
+      - ./:/app/fluxgym
       - ../cache_huggingface:/home/appuser/.cache/huggingface/
     stop_signal: SIGKILL
     tty: true
