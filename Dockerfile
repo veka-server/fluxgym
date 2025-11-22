@@ -33,8 +33,8 @@ RUN pip install torch torchvision torchaudio --extra-index-url https://download.
 RUN chown -R appuser:appuser /app
 
 # delete redundant requirements.txt and sd-scripts directory within the container
-RUN rm -r ./sd-scripts
-RUN rm ./requirements.txt
+#RUN rm -r ./sd-scripts
+#RUN rm ./requirements.txt
 
 #Run application as non-root
 USER appuser
