@@ -4,6 +4,7 @@ os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 os.environ['GRADIO_ANALYTICS_ENABLED'] = '0'
 sys.path.insert(0, os.getcwd())
 sys.path.append(os.path.join(os.path.dirname(__file__), 'sd-scripts'))
+sys.path.insert(1, 'sd-scripts')
 import subprocess
 import gradio as gr
 from PIL import Image
