@@ -1,6 +1,7 @@
 # Base image with CUDA 12.2
 #FROM nvidia/cuda:12.2.2-base-ubuntu22.04
-FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
+#FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn9-runtime
 
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
@@ -30,7 +31,7 @@ COPY ./requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
-RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
+# RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 
 RUN chown -R appuser:appuser /app
 
