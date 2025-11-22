@@ -1,6 +1,6 @@
 const path = require('path')
 module.exports = {
-  version: "2.1",
+  version: "3.2",
   title: "fluxgym",
   description: "[NVIDIA Only] Dead simple web UI for training FLUX LoRA with LOW VRAM support (From 12GB)",
   icon: "icon.png",
@@ -18,6 +18,13 @@ module.exports = {
         icon: "fa-solid fa-plug",
         text: "Installing",
         href: "install.js",
+      }]
+    } else if (running.update) {
+      return [{
+        default: true,
+        icon: 'fa-solid fa-terminal',
+        text: "Updating",
+        href: "update.js",
       }]
     } else if (installed) {
       if (running.start) {
@@ -45,13 +52,6 @@ module.exports = {
             href: "start.js",
           }]
         }
-      } else if (running.update) {
-        return [{
-          default: true,
-          icon: 'fa-solid fa-terminal',
-          text: "Updating",
-          href: "update.js",
-        }]
       } else if (running.reset) {
         return [{
           default: true,
@@ -83,7 +83,7 @@ module.exports = {
           href: "reset.js",
         }]
       }
-    } else {
+    } else if (!running.update) {
       return [{
         default: true,
         icon: "fa-solid fa-plug",

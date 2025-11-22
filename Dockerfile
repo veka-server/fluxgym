@@ -55,6 +55,19 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 #USER appuser
 RUN ls -alh
 
+USER appuser
+WORKDIR /home/appuser
+
+# Installer huggingface-cli
+RUN pip install --no-cache-dir huggingface_hub
+
+# Téléchargement des modèles en mode HF_HUB_OFFLINE=0
+RUN HF_HUB_OFFLINE=0 huggingface-cli download openai/clip-vit-large-patch14 && \
+    HF_HUB_OFFLINE=0 huggingface-cli download google/t5-v1_1-xxl
+
+# Ajouter la variable d'environnement pour le mode offline
+ENV HF_HUB_OFFLINE=1
+
 # Run fluxgym Python application
 ENTRYPOINT ["/app/fluxgym/entrypoint.sh"]
 CMD ["python3", "./app.py"]
