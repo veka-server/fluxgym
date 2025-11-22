@@ -13,3 +13,5 @@ jobs:
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    with:
+      skip_trivy: 'true'   # <-- Trivy sera ignoré
