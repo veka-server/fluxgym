@@ -1,7 +1,7 @@
 # Base image with CUDA 12.2
 #FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 #FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
-FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn9-runtime
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
