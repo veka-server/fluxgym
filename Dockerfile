@@ -6,6 +6,8 @@ FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
     git \
+    python3-pip \
+    python3-dev \
     libgl1 \
     libglib2.0-0 \
     build-essential  # Install dependencies for building extensions
