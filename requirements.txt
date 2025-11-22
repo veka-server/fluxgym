@@ -22,7 +22,7 @@ rich==13.7.0
 sentencepiece==0.2.0
 
 gradio
-gradio_logsview 
+gradio_logsview@https://huggingface.co/spaces/cocktailpeanut/gradio_logsview/resolve/main/gradio_logsview-0.0.17-py3-none-any.whl
 python-slugify
 imagesize
 pydantic==2.9.2
