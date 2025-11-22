@@ -1,35 +1,50 @@
-safetensors
-git+https://github.com/huggingface/diffusers.git
-gradio_logsview@https://huggingface.co/spaces/cocktailpeanut/gradio_logsview/resolve/main/gradio_logsview-0.0.17-py3-none-any.whl
-transformers
+# Core ML - versions stables et compatibles
+torch==2.3.1
+torchvision==0.18.1
+torchaudio==2.3.1
+diffusers==0.31.0
+transformers==4.45.2
+accelerate==0.34.2
+safetensors==0.4.5
+peft==0.12.0
+
+# UI - pin versions critiques
+gradio==4.44.1
+gradio-logsview @ https://huggingface.co/spaces/cocktailpeanut/gradio_logsview/resolve/main/gradio_logsview-0.0.17-py3-none-any.whl
+pydantic==2.9.2  # Doublon supprimé, version fixée
+
+# LoRA et optimisation
 lycoris-lora==1.8.3
-flatten_json
-pyyaml
-oyaml
-tensorboard
-kornia
-invisible-watermark
-einops
-accelerate
-toml
-albumentations
-pydantic
-omegaconf
-k-diffusion
-open_clip_torch
-timm
-prodigyopt
-controlnet_aux==0.0.7
-python-dotenv
-bitsandbytes
-hf_transfer
-lpips
-pytorch_fid
-optimum-quanto
-sentencepiece
-huggingface_hub
-peft
-gradio
-python-slugify
-imagesize
-pydantic==2.9.2
+bitsandbytes==0.44.1
+optimum-quanto==0.2.4
+
+# Utilities avec versions compatibles
+python-dotenv==1.0.1
+python-slugify==8.0.4
+imagesize==1.4.1
+flatten_json==0.1.14
+pyyaml==6.0.2
+oyaml==1.0
+toml==0.10.2
+omegaconf==2.3.0
+
+# Vision et processing
+albumentations==1.4.15
+kornia==0.7.3
+controlnet-aux==0.0.7
+einops==0.8.0
+open-clip-torch==2.26.1
+timm==1.0.9
+
+# Logging et monitoring
+tensorboard==2.18.0
+k-diffusion==0.1.1
+hf-transfer==0.1.8
+lpips==0.1.4
+pytorch-fid==0.3.0
+invisible-watermark==0.2.0
+sentencepiece==0.2.0
+huggingface-hub==0.25.2
+
+# Dépendances optionnelles (commentez si inutilisé)
+# prodigyopt==1.0   # Commenté car rarement utilisé
