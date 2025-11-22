@@ -6,7 +6,8 @@ ftfy==6.1.1
 opencv-python==4.8.1.78
 einops==0.7.0
 pytorch-lightning==1.9.0
-bitsandbytes==0.44.0
+#bitsandbytes==0.44.0
+bitsandbytes-cuda129
 prodigyopt==1.0
 lion-pytorch==0.0.6
 schedulefree==1.4
@@ -32,4 +33,3 @@ pydantic==2.9.2
 #torchaudio
 
 triton
-#bitsandbytes-cuda121
