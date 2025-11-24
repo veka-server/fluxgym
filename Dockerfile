@@ -13,9 +13,9 @@ ENV PUID=${PUID:-1000}
 ENV PGID=${PGID:-1000}
 
 # Create a group with the specified GID
-RUN groupadd -g "${PGID}" appuser
+#RUN groupadd -g "${PGID}" appuser
 # Create a user with the specified UID and GID
-RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
+#RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
 WORKDIR /app
 
@@ -40,7 +40,7 @@ RUN chown -R appuser:appuser /app
 #RUN rm ./requirements.txt
 
 #Run application as non-root
-USER appuser
+#USER appuser
 
 # Copy fluxgym application code
 COPY . ./fluxgym
@@ -52,7 +52,7 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 # Installer huggingface-cli
 RUN pip install --no-cache-dir huggingface_hub
 
-USER appuser
+#USER appuser
 WORKDIR /home/appuser
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
