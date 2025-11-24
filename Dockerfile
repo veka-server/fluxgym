@@ -1,5 +1,5 @@
 # Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 #FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
 #FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
