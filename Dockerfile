@@ -32,7 +32,6 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 # RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 #RUN pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-RUN pip install huggingface_hub
 
 RUN chown -R appuser:appuser /app
 
@@ -57,8 +56,8 @@ USER appuser
 WORKDIR /home/appuser
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
-RUN hf download openai/clip-vit-large-patch14 && \
-    hf download google/t5-v1_1-xxl
+RUN huggingface-cli download openai/clip-vit-large-patch14 && \
+    huggingface-cli download google/t5-v1_1-xxl
 
 # Ajouter la variable d'environnement pour le mode offline
 ENV HF_HUB_OFFLINE=1
