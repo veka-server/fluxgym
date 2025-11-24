@@ -23,6 +23,11 @@ RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
 WORKDIR /app
 
+RUN git clone https://github.com/timdettmers/bitsandbytes.git && \
+    cd bitsandbytes && \
+    CUDA_VERSION=122 make cuda12x && \
+    python setup.py install
+
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     cd sd-scripts && \
