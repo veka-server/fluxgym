@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 #RUN pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-RUN chown -R appuser:appuser /app
+# RUN chown -R appuser:appuser /app
 
 # delete redundant requirements.txt and sd-scripts directory within the container
 #RUN rm -r ./sd-scripts
@@ -53,7 +53,7 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 RUN pip install --no-cache-dir huggingface_hub
 
 #USER appuser
-WORKDIR /home/appuser
+# WORKDIR /home/appuser
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
 RUN huggingface-cli download openai/clip-vit-large-patch14 && \
