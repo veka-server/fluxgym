@@ -1,13 +1,9 @@
 # Base image with CUDA 12.2
-#FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
-#FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
 FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
     git \
-#    python3-pip \
-#    python3-dev \
     libgl1 \
     libglib2.0-0 \
     build-essential  # Install dependencies for building extensions
@@ -23,11 +19,6 @@ RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
 WORKDIR /app
 
-#RUN git clone https://github.com/timdettmers/bitsandbytes.git && \
-#    cd bitsandbytes && \
-#    CUDA_VERSION=122 make cuda122 && \
-#    python setup.py install
-
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
     cd sd-scripts && \
@@ -40,7 +31,7 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 # Install Torch, Torchvision, and Torchaudio for CUDA 12.2
 # RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 #RUN pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+RUN pip install torch torchvision huggingface_hub --index-url https://download.pytorch.org/whl/cu124
 
 RUN chown -R appuser:appuser /app
 
@@ -58,7 +49,18 @@ EXPOSE 7860
 
 ENV GRADIO_SERVER_NAME="0.0.0.0"
 
-WORKDIR /app/fluxgym
+# Installer huggingface-cli
+RUN pip install --no-cache-dir huggingface_hub
+
+USER appuser
+WORKDIR /home/appuser
+
+# Téléchargement des modèles en mode HF_HUB_OFFLINE=0
+RUN hf download openai/clip-vit-large-patch14 && \
+    hf download google/t5-v1_1-xxl
+
+# Ajouter la variable d'environnement pour le mode offline
+ENV HF_HUB_OFFLINE=1
 
 # Run fluxgym Python application
 CMD ["python3", "./app.py"]
