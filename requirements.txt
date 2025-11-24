@@ -32,4 +32,4 @@ pydantic==2.9.2
 #torchvision
 #torchaudio
 
-triton==2.2.0
+triton==3.5.1
