@@ -1,13 +1,13 @@
 # Base image with CUDA 12.2
-FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+#FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 #FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
-#FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Install pip if not already installed
 RUN apt-get update -y && apt-get install -y \
     git \
-    python3-pip \
-    python3-dev \
+#    python3-pip \
+#    python3-dev \
     libgl1 \
     libglib2.0-0 \
     build-essential  # Install dependencies for building extensions
@@ -23,10 +23,10 @@ RUN useradd -m -s /bin/sh -u "${PUID}" -g "${PGID}" appuser
 
 WORKDIR /app
 
-RUN git clone https://github.com/timdettmers/bitsandbytes.git && \
-    cd bitsandbytes && \
-    CUDA_VERSION=122 make cuda122 && \
-    python setup.py install
+#RUN git clone https://github.com/timdettmers/bitsandbytes.git && \
+#    cd bitsandbytes && \
+#    CUDA_VERSION=122 make cuda122 && \
+#    python setup.py install
 
 # Get sd-scripts from kohya-ss and install them
 RUN git clone -b sd3 https://github.com/kohya-ss/sd-scripts && \
