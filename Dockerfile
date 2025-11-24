@@ -25,7 +25,7 @@ WORKDIR /app
 
 RUN git clone https://github.com/timdettmers/bitsandbytes.git && \
     cd bitsandbytes && \
-    CUDA_VERSION=122 make cuda12x && \
+    CUDA_VERSION=122 make cuda122 && \
     python setup.py install
 
 # Get sd-scripts from kohya-ss and install them
