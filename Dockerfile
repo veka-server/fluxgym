@@ -56,8 +56,8 @@ RUN pip install --no-cache-dir huggingface_hub
 # WORKDIR /home/appuser
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
-RUN huggingface-cli download openai/clip-vit-large-patch14 && \
-    huggingface-cli download google/t5-v1_1-xxl
+#RUN huggingface-cli download openai/clip-vit-large-patch14 && \
+#    huggingface-cli download google/t5-v1_1-xxl
 
 # Ajouter la variable d'environnement pour le mode offline
 ENV HF_HUB_OFFLINE=1
