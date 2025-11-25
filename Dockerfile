@@ -70,6 +70,8 @@ ENV GRADIO_SERVER_NAME="0.0.0.0"
 # Ajouter la variable d'environnement pour le mode offline
 ENV HF_HUB_OFFLINE=1
 
+ENV PATH="/home/appuser/.local/bin:/opt/conda/bin:${PATH}"
+
 #USER appuser
 WORKDIR /app/fluxgym
 
