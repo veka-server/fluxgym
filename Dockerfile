@@ -63,4 +63,4 @@ RUN pip install --no-cache-dir huggingface_hub
 ENV HF_HUB_OFFLINE=1
 
 # Run fluxgym Python application
-CMD ["python3", "./app.py"]
+CMD ["python3", "./fluxgym/app.py"]
