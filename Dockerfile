@@ -45,7 +45,10 @@ USER appuser
 # Copy fluxgym application code
 COPY . ./fluxgym
 
+USER root
 RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 7860
 
