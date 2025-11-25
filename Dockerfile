@@ -5,8 +5,8 @@ FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 RUN apt-get update -y && apt-get install -y \
     git \
     libgl1 \
-    libglib2.0-0
-#    build-essential  # Install dependencies for building extensions
+    libglib2.0-0 \
+    build-essential  # Install dependencies for building extensions
 
 # Define environment variables for UID and GID and local timezone
 ENV PUID=${PUID:-1000}
