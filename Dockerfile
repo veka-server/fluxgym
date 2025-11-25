@@ -45,6 +45,8 @@ USER appuser
 # Copy fluxgym application code
 COPY . ./fluxgym
 
+RUN chown -R appuser:appuser /app
+
 EXPOSE 7860
 
 ENV GRADIO_SERVER_NAME="0.0.0.0"
