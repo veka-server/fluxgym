@@ -22,8 +22,10 @@ from argparse import Namespace
 import train_network
 import toml
 import re
-import base64  # Ajout pour l'encodage des images
-from openai import OpenAI  # Ajout pour l'API OpenAI
+import base64
+# Import pour les requêtes HTTP sans dépendances supplémentaires
+import urllib.request
+import urllib.error
 
 MAX_IMAGES = 150
 
@@ -72,7 +74,7 @@ def readme(base_model, lora_name, instance_prompt, sample_prompts):
         # Sort by numeric index
         sample_image_paths.sort(key=lambda x: x[0], reverse=True)
 
-        final_sample_image_paths = sample_prompts_path[:len(sample_prompts)]
+        final_sample_image_paths = sample_image_paths[:len(sample_prompts)]
         final_sample_image_paths.sort(key=lambda x: x[1])
         for i, prompt in enumerate(sample_prompts):
             _, _, image_path = final_sample_image_paths[i]
@@ -286,18 +288,19 @@ def run_captioning(images, concept_sentence, *captions):
     use_openai = get_captioning_backend()
     
     if use_openai:
-        print("Using OpenAI compatible API for captioning")
+        print(f"✅ Using OpenAI compatible API (Model: {os.getenv('OPENAI_MODEL')})")
         openai_url = os.getenv("OPENAI_URL")
         openai_key = os.getenv("OPENAI_KEY")
         openai_model = os.getenv("OPENAI_MODEL")
         
-        client = OpenAI(
-            api_key=openai_key,
-            base_url=openai_url
-        )
+        # S'assurer que l'URL se termine par /v1/chat/completions
+        if not openai_url.endswith('/'):
+            openai_url += '/'
+        if 'chat/completions' not in openai_url:
+            openai_url += 'v1/chat/completions'
     else:
-        print("Using Florence-2 for captioning")
-        #Load internally to not consume resources for training
+        print("🤖 Using Florence-2 for captioning")
+        # Load internally to not consume resources for training
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"device={device}")
         torch_dtype = torch.float16
@@ -313,39 +316,61 @@ def run_captioning(images, concept_sentence, *captions):
             image = Image.open(image_path).convert("RGB")
 
         if use_openai:
-            # Utiliser l'API OpenAI compatible
-            # Convertir l'image en base64
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-            
-            # Détecter le format de l'image
-            image_format = Image.open(image_path).format.lower()
-            if image_format == 'png':
-                mime_type = "image/png"
-            else:
-                mime_type = "image/jpeg"
-            
-            response = client.chat.completions.create(
-                model=openai_model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "Generate a detailed caption for this image"},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{base64_image}"
+            # Utiliser l'API OpenAI compatible sans dépendances
+            try:
+                with open(image_path, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+                # Détecter le format de l'image
+                image_format = Image.open(image_path).format.lower()
+                mime_type = "image/png" if image_format == 'png' else "image/jpeg"
+                
+                # Construire le payload JSON
+                payload = {
+                    "model": openai_model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "Generate a detailed caption for this image"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{mime_type};base64,{base64_image}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=1024
-            )
-            
-            caption_text = response.choices[0].message.content
-            print(f"OpenAI caption_text = {caption_text}, concept_sentence={concept_sentence}")
+                            ]
+                        }
+                    ],
+                    "max_tokens": 1024
+                }
+                
+                # Créer la requête HTTP
+                headers = {
+                    'Authorization': f'Bearer {openai_key}',
+                    'Content-Type': 'application/json'
+                }
+                
+                request = urllib.request.Request(
+                    openai_url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers=headers
+                )
+                
+                # Envoyer la requête et récupérer la réponse
+                with urllib.request.urlopen(request) as response:
+                    response_data = json.loads(response.read().decode('utf-8'))
+                
+                caption_text = response_data['choices'][0]['message']['content']
+                print(f"✅ OpenAI caption generated successfully")
+                
+            except urllib.error.HTTPError as e:
+                error_message = e.read().decode('utf-8')
+                print(f"❌ OpenAI API HTTP error: {e.code} - {error_message}")
+                caption_text = "Error generating caption"
+            except Exception as e:
+                print(f"❌ OpenAI API error: {e}")
+                caption_text = "Error generating caption"
             
         else:
             # Utiliser Florence-2 (code existant)
@@ -365,7 +390,6 @@ def run_captioning(images, concept_sentence, *captions):
             )
             print(f"parsed_answer = {parsed_answer}")
             caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
-            print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
         
         if concept_sentence:
             caption_text = f"{concept_sentence} {caption_text}"
