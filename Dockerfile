@@ -47,6 +47,8 @@ RUN pip install --no-cache-dir -r ./requirements.txt
 #RUN pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu122/torch_stable.html
 RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
+RUN pip install timm
+
 #RUN chown -R appuser:appuser /app
 
 # delete redundant requirements.txt and sd-scripts directory within the container
