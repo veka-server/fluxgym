@@ -75,7 +75,8 @@ RUN pip install --no-cache-dir huggingface_hub
 
 # Téléchargement des modèles en mode HF_HUB_OFFLINE=0
 #RUN /home/appuser/.local/bin/huggingface-cli download openai/clip-vit-large-patch14 && \
-#    /home/appuser/.local/bin/huggingface-cli download google/t5-v1_1-xxl
+#    /home/appuser/.local/bin/huggingface-cli download google/t5-v1_1-xxl \
+#    /home/appuser/.local/bin/huggingface-cli download multimodalart/Florence-2-large-no-flash-attn
 #USER appuser
 
 # Ajouter la variable d'environnement pour le mode offline
