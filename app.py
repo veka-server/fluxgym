@@ -22,6 +22,9 @@ from argparse import Namespace
 import train_network
 import toml
 import re
+import base64  # Ajout pour l'encodage des images
+from openai import OpenAI  # Ajout pour l'API OpenAI
+
 MAX_IMAGES = 150
 
 with open('models.yaml', 'r') as file:
@@ -69,7 +72,7 @@ def readme(base_model, lora_name, instance_prompt, sample_prompts):
         # Sort by numeric index
         sample_image_paths.sort(key=lambda x: x[0], reverse=True)
 
-        final_sample_image_paths = sample_image_paths[:len(sample_prompts)]
+        final_sample_image_paths = sample_prompts_path[:len(sample_prompts)]
         final_sample_image_paths.sort(key=lambda x: x[1])
         for i, prompt in enumerate(sample_prompts):
             _, _, image_path = final_sample_image_paths[i]
@@ -97,7 +100,7 @@ base_model: {base_model_name}
 
 # {lora_name}
 
-A Flux LoRA trained on a local computer with [Fluxgym](https://github.com/cocktailpeanut/fluxgym)
+A Flux LoRA trained on a local computer with [Fluxgym](https://github.com/cocktailpeanut/fluxgym )
 
 <Gallery />
 
@@ -169,7 +172,7 @@ def upload_hf(base_model, lora_rows, repo_owner, repo_name, repo_visibility, hf_
     )
     print(f"upload_hf args={args}")
     huggingface_util.upload(args=args, src=src)
-    gr.Info(f"[Upload Complete] https://huggingface.co/{repo_id}", duration=None)
+    gr.Info(f"[Upload Complete] https://huggingface.co/ {repo_id}", duration=None)
 
 def load_captioning(uploaded_files, concept_sentence):
     uploaded_images = [file for file in uploaded_files if not file.endswith('.txt')]
@@ -267,19 +270,41 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
+def get_captioning_backend():
+    """Vérifie si l'API OpenAI compatible est configurée"""
+    openai_url = os.getenv("OPENAI_URL")
+    openai_key = os.getenv("OPENAI_KEY")
+    openai_model = os.getenv("OPENAI_MODEL")
+    return all([openai_url, openai_key, openai_model])
 
 def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
-    #Load internally to not consume resources for training
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device={device}")
-    torch_dtype = torch.float16
-    model = AutoModelForCausalLM.from_pretrained(
-        "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
-    ).to(device)
-    processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
+    
+    # Vérifier quel backend utiliser
+    use_openai = get_captioning_backend()
+    
+    if use_openai:
+        print("Using OpenAI compatible API for captioning")
+        openai_url = os.getenv("OPENAI_URL")
+        openai_key = os.getenv("OPENAI_KEY")
+        openai_model = os.getenv("OPENAI_MODEL")
+        
+        client = OpenAI(
+            api_key=openai_key,
+            base_url=openai_url
+        )
+    else:
+        print("Using Florence-2 for captioning")
+        #Load internally to not consume resources for training
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"device={device}")
+        torch_dtype = torch.float16
+        model = AutoModelForCausalLM.from_pretrained(
+            "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
+        ).to(device)
+        processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
 
     captions = list(captions)
     for i, image_path in enumerate(images):
@@ -287,33 +312,74 @@ def run_captioning(images, concept_sentence, *captions):
         if isinstance(image_path, str):  # If image is a file path
             image = Image.open(image_path).convert("RGB")
 
-        prompt = "<DETAILED_CAPTION>"
-        inputs = processor(text=prompt, images=image, return_tensors="pt").to(device, torch_dtype)
-        print(f"inputs {inputs}")
+        if use_openai:
+            # Utiliser l'API OpenAI compatible
+            # Convertir l'image en base64
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            # Détecter le format de l'image
+            image_format = Image.open(image_path).format.lower()
+            if image_format == 'png':
+                mime_type = "image/png"
+            else:
+                mime_type = "image/jpeg"
+            
+            response = client.chat.completions.create(
+                model=openai_model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Generate a detailed caption for this image"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=1024
+            )
+            
+            caption_text = response.choices[0].message.content
+            print(f"OpenAI caption_text = {caption_text}, concept_sentence={concept_sentence}")
+            
+        else:
+            # Utiliser Florence-2 (code existant)
+            prompt = "<DETAILED_CAPTION>"
+            inputs = processor(text=prompt, images=image, return_tensors="pt").to(device, torch_dtype)
+            print(f"inputs {inputs}")
 
-        generated_ids = model.generate(
-            input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
-        )
-        print(f"generated_ids {generated_ids}")
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
+            )
+            print(f"generated_ids {generated_ids}")
 
-        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-        print(f"generated_text: {generated_text}")
-        parsed_answer = processor.post_process_generation(
-            generated_text, task=prompt, image_size=(image.width, image.height)
-        )
-        print(f"parsed_answer = {parsed_answer}")
-        caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
-        print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+            print(f"generated_text: {generated_text}")
+            parsed_answer = processor.post_process_generation(
+                generated_text, task=prompt, image_size=(image.width, image.height)
+            )
+            print(f"parsed_answer = {parsed_answer}")
+            caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
+            print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+        
         if concept_sentence:
             caption_text = f"{concept_sentence} {caption_text}"
         captions[i] = caption_text
 
         yield captions
-    model.to("cpu")
-    del model
-    del processor
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    
+    # Nettoyage uniquement pour Florence-2
+    if not use_openai:
+        model.to("cpu")
+        del model
+        del processor
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 def recursive_update(d, u):
     for k, v in u.items():
@@ -946,7 +1012,8 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                             scale=1,
                         )
                     with gr.Group(visible=False) as captioning_area:
-                        do_captioning = gr.Button("Add AI captions with Florence-2")
+                        # Bouton renommé pour être plus générique
+                        do_captioning = gr.Button("Add AI captions")
                         output_components.append(captioning_area)
                         #output_components = [captioning_area]
                         caption_list = []
@@ -1114,7 +1181,6 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     )
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
     demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
-    refresh.click(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
     demo.launch(debug=True, show_error=True, allowed_paths=[cwd])
