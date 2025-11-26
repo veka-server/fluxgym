@@ -32,7 +32,6 @@ with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
 
 def readme(base_model, lora_name, instance_prompt, sample_prompts):
-    # ... (fonction inchangée) ...
     model_config = models[base_model]
     model_file = model_config["file"]
     base_model_name = model_config["base"]
@@ -720,9 +719,45 @@ current_account = account_hf()
 with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     with gr.Tabs() as tabs:
         with gr.TabItem("Gym"):
-            output_components = []
-            caption_list = []
+            # CRÉER LES COMPOSANTS DANS LE BON ORDRE
+            # 1. D'abord le conteneur captioning_area
+            captioning_area = gr.Group(visible=False)
+            with captioning_area:
+                do_captioning = gr.Button("Add AI captions")
+                
+                # Créer et stocker les composants dans des listes
+                image_rows = []
+                image_components = []
+                caption_components = []
+                
+                for i in range(1, MAX_IMAGES + 1):
+                    with gr.Row(visible=False) as row:
+                        image = gr.Image(
+                            type="filepath", width=111, height=111, min_width=111,
+                            interactive=False, scale=2, show_label=False,
+                            show_share_button=False, show_download_button=False
+                        )
+                        caption = gr.Textbox(label=f"Caption {i}", scale=15, interactive=True)
+                    
+                    image_rows.append(row)
+                    image_components.append(image)
+                    caption_components.append(caption)
             
+            # 2. Créer les boutons refresh et start
+            refresh = gr.Button("Refresh", elem_id="refresh", visible=False)
+            start = gr.Button("Start training", visible=False, elem_id="start_training")
+            
+            # 3. CONSTRUIRE output_components DANS LE BON ORDRE
+            output_components = [captioning_area]
+            # Intercaler rows, images et captions
+            for i in range(MAX_IMAGES):
+                output_components.append(image_rows[i])
+                output_components.append(image_components[i])
+                output_components.append(caption_components[i])
+            output_components.append(refresh)
+            output_components.append(start)
+            
+            # CRÉER LES AUTRES COMPOSANTS (qui ne sont pas dans output_components)
             with gr.Row():
                 gr.HTML("""<nav>
             <img id='logo' src='/file=icon.png' width='80' height='80'>
@@ -761,6 +796,9 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                     gr.Markdown("""# Step 2. Dataset
         <p style="margin-top:0">Make sure the captions include the trigger word.</p>""", elem_classes="group_padding")
                     
+                    # Utiliser le composant captioning_area créé précédemment
+                    captioning_area.render()  # Rendre le composant créé plus haut
+                    
                     images = gr.File(
                         file_types=["image", ".txt"],
                         label="Upload your images",
@@ -769,36 +807,14 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         visible=True,
                         scale=1,
                     )
-                    
-                    with gr.Group(visible=False) as captioning_area:
-                        do_captioning = gr.Button("Add AI captions")
-                        
-                        for i in range(1, MAX_IMAGES + 1):
-                            with gr.Row(visible=False) as row:
-                                image = gr.Image(
-                                    type="filepath", width=111, height=111, min_width=111,
-                                    interactive=False, scale=2, show_label=False,
-                                    show_share_button=False, show_download_button=False
-                                )
-                                caption = gr.Textbox(label=f"Caption {i}", scale=15, interactive=True)
-                            
-                            # Ajouter les 3 composants (row, image, caption) à la liste
-                            output_components.extend([row, image, caption])
-                            caption_list.append(caption)
-                    
-                    # Les composants refresh et start sont déjà créés plus bas
-                    # On les ajoutera à output_components après leur création
                 
                 with gr.Column():
                     gr.Markdown("""# Step 3. Train
         <p style="margin-top:0">Press start to start training.</p>""", elem_classes="group_padding")
                     
-                    refresh = gr.Button("Refresh", elem_id="refresh", visible=False)
-                    start = gr.Button("Start training", visible=False, elem_id="start_training")
-                    
-                    # Ajouter refresh et start à la fin de output_components
-                    output_components.append(refresh)
-                    output_components.append(start)
+                    # Rendre les boutons créés précédemment
+                    refresh.render()
+                    start.render()
                     
                     train_script = gr.Textbox(label="Train script", max_lines=100, interactive=True)
                     train_config = gr.Textbox(label="Train config", max_lines=100, interactive=True)
@@ -843,22 +859,15 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
             hf_logout.click(fn=logout_hf, outputs=[hf_token, hf_login, hf_logout, repo_owner])
 
     publish_tab.select(refresh_publish_tab, outputs=lora_rows)
-    lora_rows.select(fn=set_repo, inputs=[lora_rows], outputs=[repo_name])
+    lora_rows.select(fn=set_repo, inputs=[lora_rows], outputs=repo_name])
 
     dataset_folder = gr.State()
     
-    listeners = [
-        base_model, lora_name, resolution, seed, workers, concept_sentence,
-        learning_rate, network_dim, max_train_epochs, save_every_n_epochs,
-        timestep_sampling, guidance_scale, vram, num_repeats, sample_prompts,
-        sample_every_n_steps, *advanced_components
-    ]
-    
-    # IMPORTANT: Capturer les IDs et valeurs AVANT de démarrer l'interface
+    # IMPORTANT: Capturer les IDs et valeurs AVANT les callbacks
     advanced_component_ids = [x.elem_id for x in advanced_components]
     original_advanced_component_values = [comp.value for comp in advanced_components]
 
-    # Les événements doivent être créés APRES que tous les composants sont définis
+    # LES CALLBACKS DOIVENT ÊTRE DÉFINIS APRÈS LA CRÉATION DE TOUS LES COMPOSANTS
     images.upload(load_captioning, inputs=[images, concept_sentence], outputs=output_components)
     images.delete(load_captioning, inputs=[images, concept_sentence], outputs=output_components)
     images.clear(hide_captioning, outputs=[captioning_area, start])
@@ -873,7 +882,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     
     start.click(
         fn=create_dataset,
-        inputs=[dataset_folder, resolution, images] + caption_list,
+        inputs=[dataset_folder, resolution, images] + caption_components,
         outputs=dataset_folder
     ).then(
         fn=start_training,
@@ -883,8 +892,8 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     
     do_captioning.click(
         fn=run_captioning,
-        inputs=[images, concept_sentence] + caption_list,
-        outputs=caption_list
+        inputs=[images, concept_sentence] + caption_components,
+        outputs=caption_components
     )
     
     demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
