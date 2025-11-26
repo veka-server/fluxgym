@@ -267,35 +267,28 @@ def create_dataset(destination_folder, size, *inputs):
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
+import base64
+import requests
+
 def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
 
-    # Check for custom OpenAI API
     OPENAI_URL = os.environ.get("OPENAI_URL")
     OPENAI_KEY = os.environ.get("OPENAI_KEY")
     OPENAI_MODEL = os.environ.get("OPENAI_MODEL")
 
     use_openai = (
-        OPENAI_URL is not None and OPENAI_URL.strip() != "" and
-        OPENAI_KEY is not None and OPENAI_KEY.strip() != "" and
-        OPENAI_MODEL is not None and OPENAI_MODEL.strip() != ""
+        OPENAI_URL and OPENAI_URL.strip() and
+        OPENAI_KEY and OPENAI_KEY.strip() and
+        OPENAI_MODEL and OPENAI_MODEL.strip()
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16
 
-    if use_openai:
-        print("➡ Using custom OpenAI API for captioning")
-
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=OPENAI_KEY,
-            base_url=OPENAI_URL.rstrip("/")
-        )
-
-    else:
+    if not use_openai:
         print("➡ Using Florence for captioning (default)")
         model = AutoModelForCausalLM.from_pretrained(
             "multimodalart/Florence-2-large-no-flash-attn",
@@ -307,6 +300,8 @@ def run_captioning(images, concept_sentence, *captions):
             "multimodalart/Florence-2-large-no-flash-attn",
             trust_remote_code=True
         )
+    else:
+        print("➡ Using custom OpenAI-compatible API for captioning")
 
     captions = list(captions)
 
@@ -317,37 +312,61 @@ def run_captioning(images, concept_sentence, *captions):
 
         if use_openai:
             # Encode image to base64
-            import base64
             import io
             buf = io.BytesIO()
             img.save(buf, format="PNG")
-            b64 = base64.b64encode(buf.getvalue()).decode()
+            b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
             prompt = "Generate a detailed caption for this image."
 
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
+            payload = {
+                "model": OPENAI_MODEL,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {"url": f"data:image/png;base64,{b64}"}
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{b64}"
+                                }
                             }
                         ]
                     }
                 ],
-                max_tokens=300
+                "max_tokens": 300
+            }
+
+            headers = {
+                "Authorization": f"Bearer {OPENAI_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(
+                f"{OPENAI_URL.rstrip('/')}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=60
             )
 
-            caption_text = response.choices[0].message["content"].strip()
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"API error {response.status_code}: {response.text}"
+                )
+
+            data = response.json()
+
+            caption_text = (
+                data["choices"][0]["message"].get("content", "").strip()
+            )
 
         else:
             # Florence captioning flow
             prompt = "<DETAILED_CAPTION>"
-            inputs = processor(text=prompt, images=img, return_tensors="pt").to(device, torch_dtype)
+            inputs = processor(
+                text=prompt, images=img, return_tensors="pt"
+            ).to(device, torch_dtype)
 
             generated_ids = model.generate(
                 input_ids=inputs["input_ids"],
@@ -366,7 +385,9 @@ def run_captioning(images, concept_sentence, *captions):
                 image_size=(img.width, img.height)
             )
 
-            caption_text = parsed["<DETAILED_CAPTION>"].replace("The image shows ", "")
+            caption_text = parsed["<DETAILED_CAPTION>"].replace(
+                "The image shows ", ""
+            )
 
         if concept_sentence:
             caption_text = f"{concept_sentence} {caption_text}"
@@ -380,7 +401,6 @@ def run_captioning(images, concept_sentence, *captions):
         del processor
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
 
 def recursive_update(d, u):
     for k, v in u.items():
