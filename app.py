@@ -22,7 +22,11 @@ from argparse import Namespace
 import train_network
 import toml
 import re
+import base64
+import requests
+
 MAX_IMAGES = 150
+DATASET_PATH = "datasets"  # <-- change this path if needed
 
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
@@ -125,20 +129,16 @@ def account_hf():
     except:
         return None
 
-"""
-hf_logout.click(fn=logout_hf, outputs=[hf_token, hf_login, hf_logout, repo_owner])
-"""
 def logout_hf():
-    os.remove("HF_TOKEN")
+    try:
+        os.remove("HF_TOKEN")
+    except:
+        pass
     global current_account
     current_account = account_hf()
     print(f"current_account={current_account}")
     return gr.update(value=""), gr.update(visible=True), gr.update(visible=False), gr.update(value="", visible=False)
 
-
-"""
-hf_login.click(fn=login_hf, inputs=[hf_token], outputs=[hf_token, hf_login, hf_logout, repo_owner])
-"""
 def login_hf(hf_token):
     api = HfApi(token=hf_token)
     try:
@@ -172,6 +172,11 @@ def upload_hf(base_model, lora_rows, repo_owner, repo_name, repo_visibility, hf_
     gr.Info(f"[Upload Complete] https://huggingface.co/{repo_id}", duration=None)
 
 def load_captioning(uploaded_files, concept_sentence):
+    """
+    Keeps original upload-based behavior: uploaded_files is a list of file paths,
+    possibly including .txt files. Builds Gradio updates (visible flags, image paths,
+    caption values) and returns them — same format expected everywhere.
+    """
     uploaded_images = [file for file in uploaded_files if not file.endswith('.txt')]
     txt_files = [file for file in uploaded_files if file.endswith('.txt')]
     txt_files_dict = {os.path.splitext(os.path.basename(txt_file))[0]: txt_file for txt_file in txt_files}
@@ -183,7 +188,6 @@ def load_captioning(uploaded_files, concept_sentence):
     elif len(uploaded_images) > MAX_IMAGES:
         raise gr.Error(f"For now, only {MAX_IMAGES} or less images are allowed for training")
     # Update for the captioning_area
-    # for _ in range(3):
     updates.append(gr.update(visible=True))
     # Update visibility and image for each captioning row and image
     for i in range(1, MAX_IMAGES + 1):
@@ -201,9 +205,11 @@ def load_captioning(uploaded_files, concept_sentence):
         if(image_value):
             base_name = os.path.splitext(os.path.basename(image_value))[0]
             if base_name in txt_files_dict:
-                with open(txt_files_dict[base_name], 'r') as file:
-                    corresponding_caption = file.read()
-
+                try:
+                    with open(txt_files_dict[base_name], 'r', encoding='utf-8') as file:
+                        corresponding_caption = file.read()
+                except:
+                    corresponding_caption = ""
         # Update value of captioning area
         text_value = corresponding_caption if visible and corresponding_caption else concept_sentence if visible and concept_sentence else None
         updates.append(gr.update(value=text_value, visible=visible))
@@ -261,59 +267,203 @@ def create_dataset(destination_folder, size, *inputs):
             print(f"{caption_path} already exists. use the existing .txt file")
         else:
             print(f"{caption_path} create a .txt caption file")
-            with open(caption_path, 'w') as file:
+            with open(caption_path, 'w', encoding='utf-8') as file:
                 file.write(original_caption)
 
     print(f"destination_folder {destination_folder}")
     return destination_folder
 
+def save_caption_for_image(image_path, caption_text):
+    """
+    Save caption_text into image_path.txt (create if missing).
+    image_path may be an uploaded tmp path or a dataset path.
+    """
+    try:
+        if not image_path:
+            return
+        txt_path = os.path.splitext(image_path)[0] + ".txt"
+        # ensure directory exists
+        dirn = os.path.dirname(txt_path)
+        if dirn and not os.path.exists(dirn):
+            os.makedirs(dirn, exist_ok=True)
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write((caption_text or "").strip())
+        print(f"Saved caption for {image_path} -> {txt_path}")
+    except Exception as e:
+        print(f"Error saving caption for {image_path}: {e}")
 
 def run_captioning(images, concept_sentence, *captions):
     print(f"run_captioning")
     print(f"concept sentence {concept_sentence}")
     print(f"captions {captions}")
-    #Load internally to not consume resources for training
+
+    OPENAI_URL = os.environ.get("OPENAI_URL")
+    OPENAI_KEY = os.environ.get("OPENAI_KEY")
+    OPENAI_MODEL = os.environ.get("OPENAI_MODEL")
+
+    use_openai = (
+        OPENAI_URL and OPENAI_URL.strip() and
+        OPENAI_KEY and OPENAI_KEY.strip() and
+        OPENAI_MODEL and OPENAI_MODEL.strip()
+    )
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device={device}")
     torch_dtype = torch.float16
-    model = AutoModelForCausalLM.from_pretrained(
-        "multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True
-    ).to(device)
-    processor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
+
+    if not use_openai:
+        print("➡ Using Florence for captioning (default)")
+        model = AutoModelForCausalLM.from_pretrained(
+            "multimodalart/Florence-2-large-no-flash-attn",
+            torch_dtype=torch_dtype,
+            trust_remote_code=True
+        ).to(device)
+
+        processor = AutoProcessor.from_pretrained(
+            "multimodalart/Florence-2-large-no-flash-attn",
+            trust_remote_code=True
+        )
+    else:
+        print("➡ Using custom OpenAI-compatible API for captioning")
 
     captions = list(captions)
+
     for i, image_path in enumerate(images):
-        print(captions[i])
-        if isinstance(image_path, str):  # If image is a file path
-            image = Image.open(image_path).convert("RGB")
+        # Defensive: images may be strings or file objects; handle only str paths
+        try:
+            current_caption_input = captions[i] if i < len(captions) else ""
+            print(f"Processing image {i}: {image_path} (current caption: {current_caption_input})")
+        except Exception as e:
+            print(f"Index error: {e}")
+            current_caption_input = ""
 
-        prompt = "<DETAILED_CAPTION>"
-        inputs = processor(text=prompt, images=image, return_tensors="pt").to(device, torch_dtype)
-        print(f"inputs {inputs}")
+        if isinstance(image_path, str):
+            img = Image.open(image_path).convert("RGB")
+        else:
+            # if it's a file-like object, try to open it
+            img = Image.open(image_path).convert("RGB")
 
-        generated_ids = model.generate(
-            input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=1024, num_beams=3
-        )
-        print(f"generated_ids {generated_ids}")
+        if use_openai:
+            # Encode image to base64
+            import io
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-        print(f"generated_text: {generated_text}")
-        parsed_answer = processor.post_process_generation(
-            generated_text, task=prompt, image_size=(image.width, image.height)
-        )
-        print(f"parsed_answer = {parsed_answer}")
-        caption_text = parsed_answer["<DETAILED_CAPTION>"].replace("The image shows ", "")
-        print(f"caption_text = {caption_text}, concept_sentence={concept_sentence}")
+            prompt = "Generate a detailed caption for this image."
+
+            payload = {
+                "model": OPENAI_MODEL,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{b64}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 300
+            }
+
+            headers = {
+                "Authorization": f"Bearer {OPENAI_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(
+                f"{OPENAI_URL.rstrip('/')}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=60
+            )
+
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"API error {response.status_code}: {response.text}"
+                )
+
+            data = response.json()
+
+            # Try to robustly parse the returned message content
+            caption_text = ""
+            try:
+                choice = data.get("choices", [])[0]
+                # new style: message is an object with content string
+                msg = choice.get("message", {})
+                if isinstance(msg, dict):
+                    # 'content' may be string or more structured
+                    if isinstance(msg.get("content"), str):
+                        caption_text = msg.get("content", "").strip()
+                    else:
+                        # fallback: try to stringify
+                        caption_text = str(msg.get("content", "")).strip()
+                else:
+                    # older style
+                    caption_text = choice.get("text", "").strip()
+            except Exception as e:
+                print(f"Error parsing API response: {e}")
+                caption_text = ""
+
+        else:
+            # Florence captioning flow
+            prompt = "<DETAILED_CAPTION>"
+            inputs = processor(
+                text=prompt, images=img, return_tensors="pt"
+            ).to(device, torch_dtype)
+
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=1024,
+                num_beams=3
+            )
+
+            generated_text = processor.batch_decode(
+                generated_ids, skip_special_tokens=False
+            )[0]
+
+            parsed = processor.post_process_generation(
+                generated_text,
+                task=prompt,
+                image_size=(img.width, img.height)
+            )
+
+            caption_text = parsed.get("<DETAILED_CAPTION>", "")
+            if caption_text is None:
+                caption_text = ""
+            caption_text = caption_text.replace("The image shows ", "")
+
         if concept_sentence:
-            caption_text = f"{concept_sentence} {caption_text}"
-        captions[i] = caption_text
+            caption_text = f"{concept_sentence} {caption_text}".strip()
+
+        # Save caption next to image (create .txt if missing)
+        try:
+            save_caption_for_image(image_path, caption_text)
+        except Exception as e:
+            print(f"Failed saving caption for {image_path}: {e}")
+
+        # Put result into the stream of captions (matching UI)
+        if i < len(captions):
+            captions[i] = caption_text
+        else:
+            captions.append(caption_text)
 
         yield captions
-    model.to("cpu")
-    del model
-    del processor
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+
+    if not use_openai:
+        try:
+            model.to("cpu")
+            del model
+            del processor
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
 
 def recursive_update(d, u):
     for k, v in u.items():
@@ -365,7 +515,6 @@ def download(base_model):
         gr.Info(f"Downloading t5xxl...")
         hf_hub_download(repo_id="comfyanonymous/flux_text_encoders", local_dir=clip_folder, filename="t5xxl_fp16.safetensors")
 
-
 def resolve_path(p):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     norm_path = os.path.normpath(os.path.join(current_dir, p))
@@ -409,15 +558,7 @@ def gen_sh(
     if len(sample_prompts) > 0 and sample_every_n_steps > 0:
         sample = f"""--sample_prompts={sample_prompts_path} --sample_every_n_steps="{sample_every_n_steps}" {line_break}"""
 
-
     ############# Optimizer args ########################
-#    if vram == "8G":
-#        optimizer = f"""--optimizer_type adafactor {line_break}
-#    --optimizer_args "relative_step=False" "scale_parameter=False" "warmup_init=False" {line_break}
-#        --split_mode {line_break}
-#        --network_args "train_blocks=single" {line_break}
-#        --lr_scheduler constant_with_warmup {line_break}
-#        --max_grad_norm 0.0 {line_break}"""
     if vram == "16G":
         # 16G VRAM
         optimizer = f"""--optimizer_type adafactor {line_break}
@@ -435,7 +576,6 @@ def gen_sh(
     else:
         # 20G+ VRAM
         optimizer = f"--optimizer_type adamw8bit {line_break}"
-
 
     #######################################################
     model_config = models[base_model]
@@ -485,18 +625,15 @@ def gen_sh(
   --model_prediction_type raw {line_break}
   --guidance_scale {guidance_scale} {line_break}
   --loss_type l2 {line_break}"""
-   
-
 
     ############# Advanced args ########################
     global advanced_component_ids
     global original_advanced_component_values
-   
+
     # check dirty
     print(f"original_advanced_component_values = {original_advanced_component_values}")
     advanced_flags = []
     for i, current_value in enumerate(advanced_components):
-#        print(f"compare {advanced_component_ids[i]}: old={original_advanced_component_values[i]}, new={current_value}")
         if original_advanced_component_values[i] != current_value:
             # dirty
             if current_value == True:
@@ -596,7 +733,6 @@ def start_training(
         file.write(train_script)
     gr.Info(f"Generated train script at {sh_filename}")
 
-
     dataset_path = resolve_path_without_quotes(f"outputs/{output_name}/dataset.toml")
     with open(dataset_path, 'w', encoding="utf-8") as file:
         file.write(train_config)
@@ -638,7 +774,6 @@ def start_training(
         f.write(md)
 
     gr.Info(f"Training Complete. Check the outputs folder for the LoRA files.", duration=None)
-
 
 def update(
     base_model,
@@ -686,9 +821,6 @@ def update(
     )
     return gr.update(value=sh), gr.update(value=toml), dataset_folder
 
-"""
-demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, hf_account])
-"""
 def loaded():
     global current_account
     current_account = account_hf()
@@ -781,14 +913,6 @@ def init_advanced():
                 if action_type == "None":
                     # radio
                     component = gr.Checkbox()
-    #            elif action_type == "<class 'str'>":
-    #                component = gr.Textbox()
-    #            elif action_type == "<class 'int'>":
-    #                component = gr.Number(precision=0)
-    #            elif action_type == "<class 'float'>":
-    #                component = gr.Number()
-    #            elif "int_or_float" in action_type:
-    #                component = gr.Number()
                 else:
                     component = gr.Textbox(value="")
                 if component != None:
@@ -802,6 +926,72 @@ def init_advanced():
             advanced_component_ids.append(component.elem_id)
     return advanced_components, advanced_component_ids
 
+# ---------- New helper functions for datasets ----------
+def list_datasets(dataset_root):
+    """
+    Return sorted list of dataset folder names inside dataset_root.
+    """
+    try:
+        if not os.path.exists(dataset_root):
+            return []
+        items = [d for d in os.listdir(dataset_root) if os.path.isdir(os.path.join(dataset_root, d))]
+        items.sort()
+        return items
+    except Exception as e:
+        print(f"Error listing datasets: {e}")
+        return []
+
+def build_uploaded_files_list_from_dataset(dataset_root, dataset_name):
+    """
+    Build a list of file paths similar to uploaded_files expected by load_captioning:
+    - include images first, and include .txt files
+    """
+    uploaded_files = []
+    folder = os.path.join(dataset_root, dataset_name)
+    if not os.path.exists(folder):
+        return uploaded_files
+
+    # collect images
+    image_exts = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
+    files = os.listdir(folder)
+    # keep stable order
+    files.sort()
+    # append images
+    for f in files:
+        if f.lower().endswith(image_exts):
+            uploaded_files.append(os.path.join(folder, f))
+    # append txts
+    for f in files:
+        if f.lower().endswith(".txt"):
+            uploaded_files.append(os.path.join(folder, f))
+    return uploaded_files
+
+def load_dataset_into_ui(dataset_name, concept_sentence):
+    """
+    Called when the dataset dropdown changes. Returns the same update list as load_captioning,
+    so it can be plugged into the same outputs (output_components).
+    """
+    if not dataset_name:
+        # hide area
+        # we must return the same number of outputs as output_components; easiest is to
+        # call load_captioning with an empty list to get an error: but better return hidden.
+        # Build an updates list that hides captioning area and all rows.
+        updates = []
+        updates.append(gr.update(visible=False))  # captioning_area
+        for i in range(1, MAX_IMAGES + 1):
+            updates.append(gr.update(visible=False))  # row visible
+            updates.append(gr.update(value=None, visible=False))  # image
+            updates.append(gr.update(value=None, visible=False))  # caption textbox
+        updates.append(gr.update(visible=False))
+        updates.append(gr.update(visible=False))
+        return updates
+
+    uploaded_files = build_uploaded_files_list_from_dataset(DATASET_PATH, dataset_name)
+    # reuse existing load_captioning logic
+    updates = load_captioning(uploaded_files, concept_sentence)
+    return updates
+
+# -----------------------------------------------------
 
 theme = gr.themes.Monochrome(
     text_size=gr.themes.Size(lg="18px", md="15px", sm="13px", xl="22px", xs="12px", xxl="24px", xxs="9px"),
@@ -935,6 +1125,17 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         """# Step 2. Dataset
         <p style="margin-top:0">Make sure the captions include the trigger word.</p>
         """, elem_classes="group_padding")
+
+                    # ---------- Dataset selector (new) ----------
+                    datasets_available = list_datasets(DATASET_PATH)
+                    dataset_dropdown = gr.Dropdown(
+                        label="Select a dataset (optional)",
+                        choices=datasets_available,
+                        value=datasets_available[0] if datasets_available else None,
+                        interactive=True
+                    )
+                    # ---------- End dataset selector ----------
+
                     with gr.Group():
                         images = gr.File(
                             file_types=["image", ".txt"],
@@ -950,6 +1151,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                         output_components.append(captioning_area)
                         #output_components = [captioning_area]
                         caption_list = []
+                        # create the UI rows, images and caption textboxes
                         for i in range(1, MAX_IMAGES + 1):
                             locals()[f"captioning_row_{i}"] = gr.Row(visible=False)
                             with locals()[f"captioning_row_{i}"]:
@@ -972,6 +1174,7 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
                             output_components.append(locals()[f"image_{i}"])
                             output_components.append(locals()[f"caption_{i}"])
                             caption_list.append(locals()[f"caption_{i}"])
+                    # end captioning area
                 with gr.Column():
                     gr.Markdown(
                         """# Step 3. Train
@@ -1061,6 +1264,9 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     ]
     advanced_component_ids = [x.elem_id for x in advanced_components]
     original_advanced_component_values = [comp.value for comp in advanced_components]
+
+    # --------- Wiring events ----------
+    # keep existing upload handlers (unchanged behavior)
     images.upload(
         load_captioning,
         inputs=[images, concept_sentence],
@@ -1075,6 +1281,35 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
         hide_captioning,
         outputs=[captioning_area, start]
     )
+
+    # when selecting a dataset, load dataset images+captions into the same UI
+    dataset_dropdown.change(
+        fn=load_dataset_into_ui,
+        inputs=[dataset_dropdown, concept_sentence],
+        outputs=output_components
+    )
+
+    # allow clearing dataset selection to hide captioning area
+    # (if user selects None in dropdown) - handled by load_dataset_into_ui
+
+    # Save caption edits when a caption textbox is edited:
+    # attach change for each caption textbox to save corresponding caption file
+    for i in range(1, MAX_IMAGES + 1):
+        img_comp = locals().get(f"image_{i}")
+        cap_comp = locals().get(f"caption_{i}")
+        if img_comp is not None and cap_comp is not None:
+            # when caption_i changes, call save_caption_for_image with image_i value and caption value
+            # outputs are empty (we don't update any component)
+            try:
+                cap_comp.change(
+                    fn=lambda image_path, new_caption: save_caption_for_image(image_path, new_caption),
+                    inputs=[img_comp, cap_comp],
+                    outputs=[]
+                )
+            except Exception as e:
+                # older gradio might need a wrapper function; just ignore if fails to attach
+                print(f"Could not attach onchange saver for caption {i}: {e}")
+
     max_train_epochs.change(
         fn=update_total_steps,
         inputs=[max_train_epochs, num_repeats, images],
@@ -1115,6 +1350,8 @@ with gr.Blocks(elem_id="app", theme=theme, css=css, fill_width=True) as demo:
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
     demo.load(fn=loaded, js=js, outputs=[hf_token, hf_login, hf_logout, repo_owner])
     refresh.click(update, inputs=listeners, outputs=[train_script, train_config, dataset_folder])
+# --------- End wiring ----------
+
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
     demo.launch(debug=True, show_error=True, allowed_paths=[cwd])
