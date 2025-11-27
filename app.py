@@ -26,7 +26,7 @@ import base64
 import requests
 
 MAX_IMAGES = 150
-DATASET_PATH = "datasets"  # <-- change this path if needed
+DATASET_PATH = os.environ.get("DATASET_PATH")
 
 with open('models.yaml', 'r') as file:
     models = yaml.safe_load(file)
